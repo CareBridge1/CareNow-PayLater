@@ -5,8 +5,6 @@ import {
   Receipt, 
   Users, 
   Settings, 
-  LifeBuoy, 
-  Search,
   ShieldCheck
 } from "lucide-react"
 

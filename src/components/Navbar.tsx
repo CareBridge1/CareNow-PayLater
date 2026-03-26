@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, ArrowRight, ShieldCheck, Heart } from 'lucide-react'
+import { Menu, ArrowRight, Heart } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { Button } from './ui/button'
 import { ThemeToggle } from './ThemeToggle'

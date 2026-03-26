@@ -208,11 +208,11 @@ export default function PaymentPage() {
             </div>
             <span className="text-sm font-semibold text-foreground truncate">{link.hospital || 'Healthcare Provider'}</span>
             <Badge className={`text-[10px] font-bold border-0 shrink-0 ${
-              link.status === 'PAID'    ? 'bg-green-500/10 text-green-700'
-              : link.status === 'PARTIAL' ? 'bg-amber-500/10 text-amber-700'
+              (link.status as string) === 'PAID'    ? 'bg-green-500/10 text-green-700'
+              : (link.status as string) === 'PARTIAL' ? 'bg-amber-500/10 text-amber-700'
               : 'bg-blue-500/10 text-blue-700'
             }`}>
-              {link.status === 'PARTIAL' ? 'Partial' : link.status === 'PAID' ? 'Paid' : 'Pending'}
+              {(link.status as string) === 'PARTIAL' ? 'Partial' : (link.status as string) === 'PAID' ? 'Paid' : 'Pending'}
             </Badge>
           </div>
 
