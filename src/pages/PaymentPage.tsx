@@ -1,18 +1,14 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { paymentService, type PaymentLink } from '../services/payment.service'
 import { formatCurrency } from '../utils/formatCurrency'
-import { Heart, Building2 as Hospital, Calendar, CheckCircle2, AlertCircle, Loader2, CreditCard, User, Mail } from 'lucide-react'
+import {
+  CheckCircle2, AlertCircle, Loader2, Lock, ShieldCheck,
+  User, FileText, ChevronRight, Phone, Mail, Building2
+} from 'lucide-react'
 import toast from 'react-hot-toast'
-import Input from '../components/Input'
-import Button from '../components/Button'
-
-const plans = [
-  { id: '1', label: 'Pay in Full', installments: 1, badge: 'Best Value', badgeColor: 'bg-accent text-white' },
-  { id: '2', label: '2 Installments', installments: 2, badge: null, badgeColor: '' },
-  { id: '3', label: '3 Installments', installments: 3, badge: null, badgeColor: '' },
-  { id: '6', label: '6 Installments', installments: 6, badge: 'Easy Pay', badgeColor: 'bg-brand-100 text-brand-700' },
-]
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
 
 export default function PaymentPage() {
   const { id } = useParams<{ id: string }>()
@@ -20,240 +16,408 @@ export default function PaymentPage() {
   const [link, setLink] = useState<PaymentLink | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selectedPlan, setSelectedPlan] = useState('1')
-  const [patientEmail, setPatientEmail] = useState('')
-  const [patientName, setPatientName] = useState('')
   const [paying, setPaying] = useState(false)
+  const [selected, setSelected] = useState<number>(0)
+  const [patientContact, setPatientContact] = useState('')
 
   useEffect(() => {
-    const fetchLink = async () => {
-      try {
-        const data = await paymentService.getLinkById(id!)
-        setLink(data)
-        if (data.patientName) setPatientName(data.patientName)
-      } catch {
-        setError('Payment link not found or has expired.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    if (id) fetchLink()
+    if (!id) return
+    paymentService.getLinkById(id)
+      .then(d => { setLink(d); if (d.patientContact) setPatientContact(d.patientContact) })
+      .catch(() => setError('Payment link not found or has expired.'))
+      .finally(() => setLoading(false))
   }, [id])
 
-  const selectedPlanObj = plans.find((p) => p.id === selectedPlan)!
-  const installmentAmount = link
-    ? Math.ceil((link.amountRemaining ?? link.amount) / selectedPlanObj.installments * 100) / 100
-    : 0
+  const totalBill = link?.amount ?? 0
+  const amountPaid = link?.amountPaid ?? 0
+  const balance = totalBill - amountPaid
+  const pct = totalBill > 0 ? Math.round((amountPaid / totalBill) * 100) : 0
+  const isPaid = amountPaid > 0
 
-  const handlePay = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!link) return
-    if (!patientEmail) {
-      toast.error('Please enter your email address')
-      return
-    }
+  const presets = useMemo(() => {
+    if (balance <= 0) return []
+    if (balance <= 5000) return [balance]
+    const half = Math.ceil(balance / 2 / 1000) * 1000
+    const quarter = Math.ceil(balance / 4 / 1000) * 1000
+    return Array.from(new Set(
+      [balance, half < balance ? half : null, quarter < half ? quarter : null]
+        .filter(Boolean) as number[]
+    )).sort((a, b) => b - a)
+  }, [balance])
+
+  useEffect(() => {
+    if (presets.length > 0 && selected === 0) setSelected(presets[0])
+  }, [presets, selected])
+
+  const handlePay = async () => {
+    if (!link || selected <= 0) return
     setPaying(true)
     try {
       const result = await paymentService.initiatePayment(link.id, {
-        installmentPlan: selectedPlan,
-        patientEmail,
-        patientName,
+        amount: selected,
+        patientEmail: patientContact.includes('@') ? patientContact : undefined,
+        patientName: link.patientName,
       })
-      toast.success('Redirecting to payment...')
-      // Redirect to Interswitch (or demo success)
+      toast.success('Opening secure payment...')
       setTimeout(() => {
-        if (result.paymentUrl.includes('demo=true')) {
-          // Demo mode: simulate success
-          navigate(`/pay/${link.id}/verify?ref=${result.transactionRef}&demo=true`)
-        } else {
-          window.location.href = result.paymentUrl
+        const run = () => {
+          setPaying(false)
+          ;(window as any).webpayCheckout({
+            ...result.formParams,
+            onComplete: () => navigate(`/pay/${link.id}/verify?ref=${result.transactionRef}`),
+          })
         }
-      }, 1000)
+        if (result.checkoutScriptUrl && result.formParams) {
+          if (!(window as any).webpayCheckout) {
+            const s = document.createElement('script')
+            s.src = result.checkoutScriptUrl; s.onload = run
+            document.body.appendChild(s)
+          } else run()
+        } else if (result.formParams) {
+          const form = document.createElement('form')
+          form.method = 'POST'; form.action = result.paymentUrl
+          Object.entries(result.formParams).forEach(([k, v]) => {
+            const inp = document.createElement('input')
+            inp.type = 'hidden'; inp.name = k; inp.value = v
+            form.appendChild(inp)
+          })
+          document.body.appendChild(form); form.submit()
+        } else if (result.paymentUrl.includes('demo=true')) {
+          navigate(`/pay/${link.id}/verify?ref=${result.transactionRef}&demo=true`)
+        } else window.location.href = result.paymentUrl
+      }, 600)
     } catch {
-      toast.error('Failed to initiate payment. Please try again.')
+      toast.error('Could not initiate payment. Please try again.')
       setPaying(false)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-white animate-spin" />
+  if (loading) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="size-8 text-primary animate-spin" />
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Loading payment…</p>
       </div>
-    )
-  }
+    </div>
+  )
 
-  if (error || !link) {
-    return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl p-10 max-w-md text-center shadow-2xl">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Not Found</h1>
-          <p className="text-gray-500">{error || 'This payment link is invalid or has expired.'}</p>
+  if (error || !link) return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <header className="w-full border-b border-border/40 bg-card/80 backdrop-blur-md">
+        <div className="max-w-screen-2xl mx-auto px-5 h-14 flex items-center justify-between">
+          <Link to="/" className="text-sm font-black tracking-tight">
+            CareNow<span className="text-primary">PayLater</span>
+          </Link>
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-green-700 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
+            <ShieldCheck className="size-3" /> Secure Portal
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-md w-full space-y-8 text-center">
+
+          {/* Icon */}
+          <div className="size-20 bg-destructive/8 rounded-3xl flex items-center justify-center mx-auto">
+            <AlertCircle className="size-10 text-destructive" />
+          </div>
+
+          {/* Message */}
+          <div className="space-y-2">
+            <h1 className="text-2xl font-black">Payment Link Not Found</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              We couldn't load this payment page. The link may be invalid, already used, or it may have expired.
+            </p>
+          </div>
+
+          {/* Possible reasons */}
+          <div className="rounded-2xl border border-border/40 bg-muted/20 p-5 text-left space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Possible reasons</p>
+            {[
+              'The link was copied or typed incorrectly',
+              'The payment has already been completed',
+              'The hospital cancelled or expired this link',
+              'The link was only valid for a limited time',
+            ].map((r, i) => (
+              <div key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                <div className="size-1.5 rounded-full bg-muted-foreground/40 mt-2 shrink-0" />
+                {r}
+              </div>
+            ))}
+          </div>
+
+          {/* What to do */}
+          <div className="rounded-2xl border border-border/40 bg-muted/20 p-5 text-left space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">What you can do</p>
+            {[
+              'Contact the hospital that sent you this link',
+              'Ask them to resend the payment link via SMS or email',
+              'Check your messages for the original link',
+            ].map((r, i) => (
+              <div key={i} className="flex items-start gap-2.5 text-sm text-foreground font-medium">
+                <span className="size-5 rounded-full bg-primary/10 text-primary text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                  {i + 1}
+                </span>
+                {r}
+              </div>
+            ))}
+          </div>
+
+          {/* Interswitch trust */}
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Lock className="size-3" />
+            <span>Payments on this portal are secured by Interswitch · PCI-DSS Certified</span>
+          </div>
+
         </div>
       </div>
-    )
-  }
+    </div>
+  )
 
-  if (link.status === 'PAID') {
-    return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl p-10 max-w-md text-center shadow-2xl">
-          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Already Paid!</h1>
-          <p className="text-gray-500">This payment has been fully completed. Thank you!</p>
-          <p className="text-brand-700 font-bold text-2xl mt-4">{formatCurrency(link.amount)}</p>
+  if (balance <= 0 || link.status === 'PAID') return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="text-center space-y-3 max-w-xs">
+        <div className="size-14 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
+          <CheckCircle2 className="size-7 text-green-500" />
         </div>
+        <h1 className="text-2xl font-bold">All Settled!</h1>
+        <p className="text-sm text-muted-foreground">This bill has been fully paid. Thank you for using {link.hospital}.</p>
+        <p className="text-3xl font-black text-primary tabular-nums pt-2">{formatCurrency(totalBill)}</p>
       </div>
-    )
-  }
+    </div>
+  )
+
+  const presetMeta = ['Clears full balance', 'Half of balance', 'Quarter of balance']
 
   return (
-    <div className="min-h-screen bg-gradient-hero py-8 px-4">
-      <div className="max-w-lg mx-auto">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-              <Heart className="w-4 h-4 text-white fill-white" />
+    <div className="min-h-[100dvh] bg-background flex flex-col">
+
+      {/* ══ SINGLE UNIFIED HEADER ══════════════════════════════════ */}
+      <header className="w-full sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border/40">
+        <div className="max-w-screen-2xl mx-auto px-5 h-14 flex items-center justify-between gap-4">
+          {/* Left: brand */}
+          <Link to="/" className="text-sm font-black tracking-tight text-foreground shrink-0">
+            CareNow<span className="text-primary">PayLater</span>
+          </Link>
+
+          {/* Center: hospital + status */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Building2 className="size-3.5 text-primary" />
             </div>
-            <span className="text-white font-bold">CareNow<span className="text-accent">PayLater</span></span>
+            <span className="text-sm font-semibold text-foreground truncate">{link.hospital || 'Healthcare Provider'}</span>
+            <Badge className={`text-[10px] font-bold border-0 shrink-0 ${
+              link.status === 'PAID'    ? 'bg-green-500/10 text-green-700'
+              : link.status === 'PARTIAL' ? 'bg-amber-500/10 text-amber-700'
+              : 'bg-blue-500/10 text-blue-700'
+            }`}>
+              {link.status === 'PARTIAL' ? 'Partial' : link.status === 'PAID' ? 'Paid' : 'Pending'}
+            </Badge>
           </div>
-          <p className="text-blue-200 text-sm">Secure Healthcare Payment</p>
+
+          {/* Right: security */}
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-green-700 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 shrink-0">
+            <ShieldCheck className="size-3" />
+            <span className="hidden sm:inline">Secure</span>
+          </div>
         </div>
+      </header>
 
-        {/* Hospital & Amount Card */}
-        <div className="glass-card mb-6 text-white">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-              <Hospital className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="font-bold text-lg">{link.hospital}</p>
-              <p className="text-blue-200 text-sm">Healthcare Provider</p>
+      {/* ══ TWO COLUMNS BELOW HEADER ════════════════════════════════ */}
+      <div className="flex-1 flex flex-col lg:flex-row">
+
+        {/* ── LEFT ─────────────────────────────────────────────────── */}
+        <div className="lg:w-[42%] lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] flex flex-col border-r border-border/30 bg-card overflow-hidden">
+
+          {/* Hero */}
+          <div className="relative h-44 lg:h-[36%] shrink-0">
+            <img
+              src="/images/hospital_patient.png"
+              alt="Hospital"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-card/95 via-card/30 to-transparent" />
+            <div className="absolute bottom-4 left-5 right-5">
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <Badge className="bg-green-500 text-white text-[10px] font-bold uppercase tracking-widest border-0 px-2 py-0.5 rounded-full">
+                  ✓ Verified Hospital
+                </Badge>
+              </div>
+              <h2 className="text-xl font-black text-foreground leading-tight">{link.hospital || 'Healthcare Provider'}</h2>
             </div>
           </div>
 
-          {link.description && (
-            <p className="text-blue-200 text-sm mb-3 italic">"{link.description}"</p>
-          )}
+          {/* Info rows */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
-          <div className="border-t border-white/20 pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-200 text-sm">Total Amount</p>
-                <p className="text-4xl font-black text-white mt-1">{formatCurrency(link.amount)}</p>
+            {/* Detail rows */}
+            <div className="rounded-2xl border border-border/40 bg-muted/20 divide-y divide-border/30 overflow-hidden">
+              <div className="px-4 py-3 flex items-center gap-3">
+                <Building2 className="size-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Provider</p>
+                  <p className="text-sm font-semibold text-foreground">{link.hospital || 'General Hospital'}</p>
+                </div>
               </div>
-              {link.status === 'PARTIAL' && link.amountPaid !== undefined && (
-                <div className="text-right">
-                  <p className="text-accent text-sm font-medium">{formatCurrency(link.amountPaid)} paid</p>
-                  <p className="text-white/70 text-sm">{formatCurrency(link.amountRemaining ?? 0)} remaining</p>
+              {link.patientName && (
+                <div className="px-4 py-3 flex items-center gap-3">
+                  <User className="size-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Patient</p>
+                    <p className="text-sm font-semibold text-foreground">{link.patientName}</p>
+                  </div>
+                </div>
+              )}
+              {patientContact && (
+                <div className="px-4 py-3 flex items-center gap-3">
+                  {patientContact.includes('@')
+                    ? <Mail className="size-4 text-muted-foreground shrink-0" />
+                    : <Phone className="size-4 text-muted-foreground shrink-0" />}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Contact</p>
+                    <p className="text-sm font-semibold text-foreground">{patientContact}</p>
+                  </div>
+                </div>
+              )}
+              {link.description && (
+                <div className="px-4 py-3 flex items-start gap-3">
+                  <FileText className="size-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Treatment</p>
+                    <p className="text-sm font-semibold text-foreground">{link.description}</p>
+                  </div>
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 mt-3 text-blue-200 text-xs">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Created {new Date(link.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            {/* Bill summary */}
+            <div className="rounded-2xl border border-border/40 bg-muted/20 p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Bill</p>
+                  <p className="text-lg font-black tabular-nums mt-0.5">{formatCurrency(totalBill)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Balance Due</p>
+                  <p className="text-lg font-black tabular-nums text-destructive mt-0.5">{formatCurrency(balance)}</p>
+                </div>
+              </div>
+              {isPaid && (
+                <div className="border-t border-border/30 pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Already Paid</p>
+                  <p className="text-base font-bold tabular-nums text-green-600 mt-0.5">{formatCurrency(amountPaid)}</p>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[11px] font-semibold text-muted-foreground">
+                  <span>{isPaid ? `${pct}% settled` : 'No payments yet'}</span>
+                  <span>{formatCurrency(amountPaid)} / {formatCurrency(totalBill)}</span>
+                </div>
+                <div className="h-1.5 w-full bg-border/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all duration-700"
+                    style={{ width: `${Math.max(pct, isPaid ? 4 : 0)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Interswitch trust badge */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/30 bg-muted/10">
+              <img src="/images/interswitch.png" alt="Interswitch" className="h-5 w-auto object-contain opacity-70" />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Payment Partner</p>
+                <p className="text-xs font-semibold text-foreground">Interswitch Group · PCI-DSS Certified</p>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        {/* Payment Form */}
-        <form onSubmit={handlePay} className="bg-white rounded-3xl p-6 shadow-2xl space-y-6">
-          {/* Patient Info */}
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Your Details</h3>
-            <div className="space-y-3">
-              <Input
-                label="Full Name"
-                placeholder="Your name"
-                value={patientName}
-                onChange={(e) => setPatientName(e.target.value)}
-                leftIcon={<User className="w-4 h-4" />}
-              />
-              <Input
-                label="Email Address"
-                type="email"
-                placeholder="your@email.com"
-                value={patientEmail}
-                onChange={(e) => setPatientEmail(e.target.value)}
-                required
-                leftIcon={<Mail className="w-4 h-4" />}
-                hint="You'll receive payment receipts at this email"
-              />
-            </div>
-          </div>
+        {/* ── RIGHT ────────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col justify-center px-5 py-8 lg:px-12">
+          <div className="max-w-sm mx-auto w-full space-y-6">
 
-          {/* Installment Plans */}
-          <div>
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Choose Your Plan</h3>
-            <p className="text-gray-500 text-sm mb-4">All plans are interest-free. 0% APR.</p>
-            <div className="grid grid-cols-2 gap-3">
-              {plans.map((plan) => {
-                const amt = link ? Math.ceil((link.amountRemaining ?? link.amount) / plan.installments * 100) / 100 : 0
-                const isSelected = selectedPlan === plan.id
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1.5">Flexible Payment</p>
+              <h2 className="text-2xl font-black leading-snug">How much do you want to pay today?</h2>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                Balance due: <strong className="text-foreground">{formatCurrency(balance)}</strong>.
+                Pay what you can — installments are welcome.
+              </p>
+            </div>
+
+            {/* Presets */}
+            <div className="space-y-2">
+              {presets.map((amt, i) => {
+                const active = selected === amt
                 return (
                   <button
-                    key={plan.id}
+                    key={amt}
                     type="button"
-                    onClick={() => setSelectedPlan(plan.id)}
-                    className={`relative p-4 rounded-2xl border-2 transition-all duration-200 text-left ${
-                      isSelected
-                        ? 'border-brand-600 bg-brand-50 shadow-brand'
-                        : 'border-gray-200 hover:border-brand-300 bg-white'
+                    onClick={() => setSelected(amt)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all cursor-pointer text-left ${
+                      active
+                        ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/10'
+                        : 'border-border/50 bg-card hover:border-primary/30 hover:bg-muted/20'
                     }`}
                   >
-                    {plan.badge && (
-                      <span className={`absolute -top-2 left-3 text-xs font-bold px-2 py-0.5 rounded-full ${plan.badgeColor}`}>
-                        {plan.badge}
-                      </span>
-                    )}
-                    <div className={`w-4 h-4 rounded-full border-2 mb-2 ${isSelected ? 'border-brand-600 bg-brand-600' : 'border-gray-300'} flex items-center justify-center`}>
-                      {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                    <div className="flex items-center gap-3">
+                      <div className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${active ? 'border-primary bg-primary' : 'border-muted-foreground/30'}`}>
+                        {active && <div className="size-2 rounded-full bg-white" />}
+                      </div>
+                      <div>
+                        <span className={`block font-bold text-base tabular-nums ${active ? 'text-primary' : 'text-foreground'}`}>
+                          {formatCurrency(amt)}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">{presetMeta[i]}</span>
+                      </div>
                     </div>
-                    <p className={`text-sm font-semibold ${isSelected ? 'text-brand-700' : 'text-gray-700'}`}>{plan.label}</p>
-                    <p className={`text-lg font-black mt-0.5 ${isSelected ? 'text-brand-900' : 'text-gray-900'}`}>
-                      {formatCurrency(amt)}
-                    </p>
-                    <p className="text-xs text-gray-500">per installment</p>
+                    {i === 0 && (
+                      <span className="text-[10px] font-bold text-green-700 bg-green-500/10 px-2 py-1 rounded-full shrink-0">Best</span>
+                    )}
                   </button>
                 )
               })}
             </div>
-          </div>
 
-          {/* Summary */}
-          <div className="bg-gray-50 rounded-2xl p-4">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>First Payment Today</span>
-              <span className="font-semibold">{formatCurrency(installmentAmount)}</span>
+            {/* What happens next */}
+            <div className="rounded-xl border border-border/40 bg-muted/10 px-4 py-3 space-y-1.5 text-xs text-muted-foreground">
+              <p className="font-bold text-foreground text-[10px] uppercase tracking-widest mb-2">After you pay</p>
+              {[
+                'Payment processed securely via Interswitch',
+                'E-receipt sent to your registered contact',
+                'Pay remaining balance anytime',
+              ].map((s, i) => (
+                <div key={i} className="flex items-start gap-1.5">
+                  <ChevronRight className="size-3 text-primary shrink-0 mt-0.5" />
+                  <span>{s}</span>
+                </div>
+              ))}
             </div>
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Total Installments</span>
-              <span className="font-semibold">{selectedPlanObj.installments}</span>
-            </div>
-            <div className="flex justify-between text-sm text-green-600 font-medium">
-              <span>Interest Rate</span>
-              <span>0% (Free!)</span>
-            </div>
-          </div>
 
-          <Button
-            type="submit"
-            loading={paying}
-            icon={<CreditCard className="w-5 h-5" />}
-            className="w-full text-base py-4"
-          >
-            Pay {formatCurrency(installmentAmount)} Now
-          </Button>
+            {/* CTA */}
+            <div className="space-y-3">
+              <Button
+                onClick={handlePay}
+                disabled={paying || selected <= 0}
+                className="w-full h-12 rounded-xl font-bold text-base"
+              >
+                {paying
+                  ? <><Loader2 className="size-4 animate-spin mr-2" />Processing…</>
+                  : `Pay ${formatCurrency(selected)} Now`
+                }
+              </Button>
+              <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-1.5">
+                <Lock className="size-3" /> 256-bit SSL · Secured by Interswitch · PCI-DSS
+              </p>
+            </div>
 
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
-            <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-            <span>Secured by Interswitch · HIPAA Compliant</span>
           </div>
-        </form>
+        </div>
       </div>
+
     </div>
   )
 }

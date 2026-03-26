@@ -4,6 +4,7 @@ export interface PaymentLink {
   id: string
   amount: number
   patientName?: string
+  patientContact?: string
   description?: string
   status: 'PENDING' | 'PARTIAL' | 'PAID'
   createdAt: string
@@ -26,12 +27,13 @@ export interface Transaction {
 
 export interface CreatePaymentLinkData {
   amount: number
+  patientContact: string
   patientName?: string
   description?: string
 }
 
 export interface InitiatePaymentData {
-  installmentPlan: string
+  amount: number
   patientEmail?: string
   patientName?: string
 }
@@ -57,9 +59,10 @@ export const paymentService = {
     return res.data as {
       paymentUrl: string
       transactionRef: string
+      formParams?: Record<string, string>
+      checkoutScriptUrl?: string
       installmentAmount: number
       installmentNumber: number
-      totalInstallments: number
     }
   },
 

@@ -1,95 +1,76 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { Menu, ArrowRight, ShieldCheck, Heart } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
-import { Heart, Menu, X, LogOut, LayoutDashboard } from 'lucide-react'
-import { useState } from 'react'
+import { Button } from './ui/button'
+import { ThemeToggle } from './ThemeToggle'
 
 export default function Navbar() {
-  const { isAuthenticated, user, logout } = useAuth()
-  const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  const handleLogout = () => {
-    logout()
-    navigate('/')
-  }
+  const { user } = useAuth()
+  const location = useLocation()
+  
+  const isLanding = location.pathname === '/'
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-gradient-brand rounded-lg flex items-center justify-center shadow-brand">
-              <Heart className="w-4 h-4 text-white fill-white" />
-            </div>
-            <span className="font-bold text-lg">
-              <span className="text-brand-700">CareNow</span>
-              <span className="text-accent font-black">PayLater</span>
-            </span>
-          </Link>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6">
-            <Link to="/#how-it-works" className="text-gray-600 hover:text-brand-700 text-sm font-medium transition-colors">
-              How It Works
-            </Link>
-            <Link to="/#for-hospitals" className="text-gray-600 hover:text-brand-700 text-sm font-medium transition-colors">
-              For Hospitals
-            </Link>
-            {isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">{user?.hospitalName}</span>
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="flex items-center gap-1.5 btn-ghost text-sm"
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 font-medium px-3 py-2 rounded-lg hover:bg-red-50 transition-all"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Link to="/login" className="btn-ghost text-sm">Login</Link>
-                <Link to="/login?tab=register" className="btn-primary text-sm py-2 px-5">
-                  Get Started
-                </Link>
-              </div>
-            )}
+    <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl">
+      <div className="flex items-center justify-between px-6 py-2.5 bg-background shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-xl border border-border/50 rounded-full transition-all duration-300">
+        
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform duration-300">
+            <Heart className="w-4 h-4 text-primary-foreground fill-primary-foreground" />
           </div>
+          <span className="font-bold text-base tracking-tight text-foreground">
+            CareNow<span className="text-primary">PayLater</span>
+          </span>
+        </Link>
 
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            onClick={() => setMenuOpen(!menuOpen)}
-          >
-            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-
-        {/* Mobile menu */}
-        {menuOpen && (
-          <div className="md:hidden border-t border-gray-100 py-4 space-y-2 animate-fade-in">
-            <Link to="/" className="block px-4 py-2 text-gray-600 hover:text-brand-700 text-sm" onClick={() => setMenuOpen(false)}>Home</Link>
-            {isAuthenticated ? (
-              <>
-                <Link to="/dashboard" className="block px-4 py-2 text-brand-700 font-medium text-sm" onClick={() => setMenuOpen(false)}>Dashboard</Link>
-                <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-red-500 text-sm">Logout</button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="block px-4 py-2 text-gray-600 text-sm" onClick={() => setMenuOpen(false)}>Login</Link>
-                <Link to="/login?tab=register" className="block px-4 py-2 text-brand-700 font-semibold text-sm" onClick={() => setMenuOpen(false)}>Get Started</Link>
-              </>
-            )}
+        {/* Desktop Links */}
+        {isLanding && (
+          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-muted-foreground/80">
+            <a href="#features" className="hover:text-primary transition-colors">How it works</a>
+            <Link to="/track" className="hover:text-primary transition-colors">Track Bill</Link>
+            <a href="#hospitals" className="hover:text-primary transition-colors">Pricing & Fees</a>
+            <a href="#hospitals" className="hover:text-primary transition-colors">Partnerships</a>
           </div>
         )}
+
+        {/* Auth / Action */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          <ThemeToggle />
+          
+          <div className="hidden h-5 w-[1px] bg-border/60 sm:block" />
+
+          {user ? (
+            <>
+              <Button asChild variant="ghost" size="sm" className="rounded-full text-sm font-bold text-muted-foreground hover:text-foreground hidden sm:inline-flex">
+                <Link to="/dashboard">Dashboard</Link>
+              </Button>
+              <Button asChild size="sm" className="rounded-full shadow-md font-bold px-5">
+                <Link to="/dashboard">
+                  Portal
+                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm" className="rounded-full font-bold hidden sm:inline-flex">
+                <Link to="/login">Sign In</Link>
+              </Button>
+              <Button asChild size="sm" className="rounded-full shadow-lg shadow-primary/20 font-bold px-6 group">
+                <Link to="/login">
+                  Get Started
+                  <ArrowRight className="w-4 h-4 ml-1 -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300" />
+                </Link>
+              </Button>
+            </>
+          )}
+
+          {/* Mobile Menu */}
+          <Button variant="ghost" size="icon" className="md:hidden rounded-full">
+            <Menu className="w-5 h-5 text-foreground" />
+          </Button>
+        </div>
       </div>
     </nav>
   )

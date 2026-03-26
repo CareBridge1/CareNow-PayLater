@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { paymentService } from '../services/payment.service'
-import { CheckCircle2, XCircle, Loader2, Heart, ArrowRight, Home, Phone } from 'lucide-react'
+import {
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Heart,
+  ArrowRight,
+  Home,
+  Receipt,
+  Phone,
+  ShieldCheck,
+} from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
 
 export default function Success() {
   const { id } = useParams<{ id: string }>()
@@ -11,14 +24,14 @@ export default function Success() {
 
   const [status, setStatus] = useState<'loading' | 'success' | 'failed'>('loading')
   const [message, setMessage] = useState('')
+  const [amount, setAmount] = useState<number | null>(null)
 
   useEffect(() => {
     const verify = async () => {
       if (isDemo) {
-        // Simulate demo verification
-        await new Promise((r) => setTimeout(r, 2000))
+        await new Promise(r => setTimeout(r, 1800))
         setStatus('success')
-        setMessage('Payment verified successfully (demo mode)')
+        setMessage('Payment verified successfully (Demo Mode)')
         return
       }
 
@@ -27,13 +40,14 @@ export default function Success() {
         if (result.status === 'SUCCESS') {
           setStatus('success')
           setMessage(result.message || 'Payment verified successfully!')
+          setAmount(result.transaction?.amount || null)
         } else {
           setStatus('failed')
           setMessage(result.message || 'Payment could not be verified.')
         }
       } catch {
         setStatus('failed')
-        setMessage('Unable to verify transaction. Please contact support.')
+        setMessage('Unable to verify transaction. Please contact your hospital.')
       }
     }
 
@@ -45,117 +59,117 @@ export default function Success() {
   }, [transactionRef, isDemo])
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2">
-            <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-              <Heart className="w-4 h-4 text-white fill-white" />
-            </div>
-            <span className="text-white font-bold text-lg">CareNow<span className="text-accent">PayLater</span></span>
-          </div>
+    <div className="min-h-screen bg-muted/30 flex flex-col items-center justify-center p-4">
+      {/* Brand header */}
+      <div className="flex items-center gap-2 mb-8">
+        <div className="size-8 rounded-full bg-primary flex items-center justify-center">
+          <Heart className="size-4 text-primary-foreground fill-primary-foreground" />
         </div>
+        <span className="font-black text-base tracking-tight text-foreground">
+          CareNow<span className="text-primary">PayLater</span>
+        </span>
+      </div>
 
-        <div className="bg-white rounded-3xl p-8 shadow-2xl text-center animate-slide-up">
+      <Card className="w-full max-w-md border-border/50 rounded-3xl shadow-xl overflow-hidden">
+        {/* Colored top strip */}
+        <div className={`h-2 w-full ${status === 'success' ? 'bg-green-500' : status === 'failed' ? 'bg-destructive' : 'bg-primary'}`} />
+
+        <CardContent className="p-8 text-center space-y-6">
+          {/* Loading */}
           {status === 'loading' && (
             <>
-              <div className="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Loader2 className="w-10 h-10 text-brand-600 animate-spin" />
+              <div className="size-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <Loader2 className="size-10 text-primary animate-spin" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Verifying Payment</h1>
-              <p className="text-gray-500">Please wait while we confirm your payment...</p>
+              <div>
+                <h1 className="text-2xl font-black text-foreground">Verifying Payment</h1>
+                <p className="text-muted-foreground font-medium mt-1">Please wait while we confirm with Interswitch...</p>
+              </div>
             </>
           )}
 
+          {/* Success */}
           {status === 'success' && (
             <>
-              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
-                <CheckCircle2 className="w-10 h-10 text-green-500" />
+              <div className="size-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="size-10 text-green-500" />
               </div>
-              <h1 className="text-3xl font-black text-gray-900 mb-2">Payment Successful! 🎉</h1>
-              <p className="text-gray-500 mb-6">{message}</p>
+              <div>
+                <Badge className="bg-green-500/10 text-green-600 border-0 font-black mb-3">Payment Confirmed</Badge>
+                <h1 className="text-3xl font-black text-foreground">All Done!</h1>
+                {amount && <p className="text-primary font-black text-2xl mt-1">₦{amount.toLocaleString()}</p>}
+                <p className="text-muted-foreground font-medium mt-2 text-sm">{message}</p>
+              </div>
 
               {transactionRef && (
-                <div className="bg-gray-50 rounded-xl p-3 mb-6">
-                  <p className="text-xs text-gray-400 mb-1">Transaction Reference</p>
-                  <p className="text-sm font-mono text-gray-700 break-all">{transactionRef}</p>
+                <div className="bg-muted/30 rounded-xl p-3 border border-border/40">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Transaction Reference</p>
+                  <p className="text-xs font-mono text-foreground break-all">{transactionRef}</p>
                 </div>
               )}
 
-              <div className="space-y-3">
-                <div className="bg-green-50 border border-green-100 rounded-2xl p-4 text-left">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-green-900">Treatment can begin</p>
-                      <p className="text-green-700 text-sm mt-0.5">
-                        Your hospital has been notified. You may now proceed with your treatment.
-                      </p>
-                    </div>
+              <div className="space-y-3 text-left">
+                <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4 flex gap-3">
+                  <CheckCircle2 className="size-4 text-green-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-black text-green-700 dark:text-green-400">Hospital Notified</p>
+                    <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                      Your provider has been automatically credited. You may proceed with treatment.
+                    </p>
                   </div>
                 </div>
-
-                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-left">
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-brand-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-brand-900">A receipt has been sent</p>
-                      <p className="text-brand-700 text-sm mt-0.5">
-                        Check your email for payment confirmation and next installment reminders.
-                      </p>
-                    </div>
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex gap-3">
+                  <Phone className="size-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-black text-foreground">Receipt Sent</p>
+                    <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                      Check your email or SMS for payment confirmation and next installment reminders.
+                    </p>
                   </div>
                 </div>
               </div>
 
               {id && (
-                <Link
-                  to={`/pay/${id}`}
-                  className="mt-4 inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-800 font-medium"
-                >
-                  Make Next Installment
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
+                <Button asChild variant="outline" className="w-full rounded-xl h-11 font-bold">
+                  <Link to={`/pay/${id}`}>
+                    <Receipt className="size-4 mr-2" /> Make Next Installment <ArrowRight className="size-4 ml-2" />
+                  </Link>
+                </Button>
               )}
             </>
           )}
 
+          {/* Failed */}
           {status === 'failed' && (
             <>
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <XCircle className="w-10 h-10 text-red-500" />
+              <div className="size-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+                <XCircle className="size-10 text-destructive" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Failed</h1>
-              <p className="text-gray-500 mb-6">{message}</p>
-
+              <div>
+                <h1 className="text-2xl font-black text-foreground">Payment Failed</h1>
+                <p className="text-muted-foreground font-medium mt-2 text-sm">{message}</p>
+              </div>
               {id && (
-                <Link
-                  to={`/pay/${id}`}
-                  className="btn-primary inline-flex items-center gap-2"
-                >
-                  Try Again
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
+                <Button asChild className="w-full rounded-xl h-11 font-bold">
+                  <Link to={`/pay/${id}`}>
+                    Try Again <ArrowRight className="size-4 ml-2" />
+                  </Link>
+                </Button>
               )}
             </>
           )}
 
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <Home className="w-4 h-4" />
-              Back to CareNow Home
+          {/* Footer */}
+          <div className="pt-4 border-t border-border/40 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-medium">
+              <Home className="size-3.5" /> Home
             </Link>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+              <ShieldCheck className="size-3.5 text-green-500" /> Secured by Interswitch
+            </div>
           </div>
-        </div>
-
-        <p className="text-center text-blue-300 text-xs mt-6">
-          Secured by Interswitch · 256-bit SSL Encrypted
-        </p>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
