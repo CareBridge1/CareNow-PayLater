@@ -7,7 +7,7 @@ import { generateWhatsAppLink } from '../utils/generateWhatsAppLink'
 import Button from '../components/Button'
 import {
   Plus, Copy, Share2, 
-  TrendingUp, Receipt, AlertCircle
+  TrendingUp, Receipt
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 

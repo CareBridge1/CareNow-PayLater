@@ -16,7 +16,6 @@ import {
   Receipt,
   CheckCircle2,
   Clock,
-  AlertCircle,
   ExternalLink,
   RefreshCw,
 } from 'lucide-react'
