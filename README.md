@@ -1,10 +1,10 @@
-# CareNow Frontend
+CareBridge
 
-CareNow is a healthcare platform designed to streamline patient billing and provide flexible installment payment options.
+CareNow PayLater is a healthcare platform designed to streamline patient billing and provie flexible installment payment options. 
 
-## Contributors
 
-*   **Ahmad Ismail** - Full Stack Engineer
-*   **Ikhahon Robinson Osamhanhiemen** - UI/UX Designer
-*   **IGHEDOSA PROMISE IRIOBOSA** - Frontend Engineer
-*   **AMUNE VICTOR EFI** - Frontend Engineer
+Contributors 
+1. Ahmad Ismail - Full stack Engineer, 
+2. Ikhahon Robinson Osamhanhiemen - UI/UX Designer, 
+3. Ighedosa Promise Iriobosa - Frontend Engineer, 
+4. Amune Victor Efi - Frontend Engineer 
