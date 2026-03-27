@@ -258,15 +258,7 @@ export default function Payments() {
       </Card>
 
       {/* Dev mode notice */}
-      {!loading && links.length === 0 && (
-        <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
-          <AlertCircle className="size-4 text-amber-500 mt-0.5 shrink-0" />
-          <div className="text-sm">
-            <p className="font-bold text-amber-600 uppercase tracking-widest text-[10px]">Demo Mode</p>
-            <p className="text-muted-foreground mt-0.5 font-medium">Backend API is not connected. Start the server to load real data.</p>
-          </div>
-        </div>
-      )}
+   
     </div>
   )
 }

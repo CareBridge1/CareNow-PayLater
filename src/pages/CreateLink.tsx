@@ -62,6 +62,8 @@ export default function CreateLink() {
         amount: parsedAmount,
         patientContact,
         description: invoiceRef ? `Invoice: ${invoiceRef}` : undefined,
+        duration: currentPlan.months,
+        installmentAmount: installment,
       })
       setCreatedLink(paymentLink)
       setEmailDest(patientContact.includes('@') ? patientContact : '')

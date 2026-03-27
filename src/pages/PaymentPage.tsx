@@ -36,14 +36,30 @@ export default function PaymentPage() {
 
   const presets = useMemo(() => {
     if (balance <= 0) return []
-    if (balance <= 5000) return [balance]
-    const half = Math.ceil(balance / 2 / 1000) * 1000
-    const quarter = Math.ceil(balance / 4 / 1000) * 1000
+    const basePresets = []
+    
+    // If there's a defined installment plan, make it the first preset
+    if (link?.installmentAmount && link.installmentAmount > 0 && link.installmentAmount < balance) {
+      basePresets.push(link.installmentAmount)
+    }
+
+    if (balance <= 5000) {
+      basePresets.push(balance)
+    } else {
+      const half = Math.ceil(balance / 2 / 1000) * 1000
+      const quarter = Math.ceil(balance / 4 / 1000) * 1000
+      basePresets.push(balance, half, quarter)
+    }
+
     return Array.from(new Set(
-      [balance, half < balance ? half : null, quarter < half ? quarter : null]
-        .filter(Boolean) as number[]
-    )).sort((a, b) => b - a)
-  }, [balance])
+      basePresets.filter(Boolean) as number[]
+    )).sort((a, b) => {
+      // Keep installment amount first if it exists
+      if (link?.installmentAmount && a === link.installmentAmount) return -1
+      if (link?.installmentAmount && b === link.installmentAmount) return 1
+      return b - a
+    })
+  }, [balance, link?.installmentAmount])
 
   useEffect(() => {
     if (presets.length > 0 && selected === 0) setSelected(presets[0])
@@ -188,7 +204,17 @@ export default function PaymentPage() {
     </div>
   )
 
-  const presetMeta = ['Clears full balance', 'Half of balance', 'Quarter of balance']
+  const successCount = link.transactions?.filter(t => t.status === 'SUCCESS').length || 0
+  const currentCycle = successCount + 1
+  
+  const getPresetLabel = (amt: number, i: number) => {
+    if (link?.installmentAmount && amt === link.installmentAmount) {
+      return `Installment ${currentCycle} of ${link.duration}`
+    }
+    if (amt === balance) return 'Clears full balance'
+    if (i === 1) return 'Half of balance'
+    return 'Quarter of balance'
+  }
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
@@ -303,6 +329,20 @@ export default function PaymentPage() {
                   <p className="text-lg font-black tabular-nums text-destructive mt-0.5">{formatCurrency(balance)}</p>
                 </div>
               </div>
+              
+              {link.duration > 1 && (
+                <div className="border-t border-border/30 pt-3 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Payment Plan</p>
+                    <p className="text-sm font-bold text-primary mt-0.5">{link.duration} Month Installments</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Monthly</p>
+                    <p className="text-sm font-bold text-foreground mt-0.5">{formatCurrency(link.installmentAmount || 0)}</p>
+                  </div>
+                </div>
+              )}
+
               {isPaid && (
                 <div className="border-t border-border/30 pt-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Already Paid</p>
@@ -371,7 +411,7 @@ export default function PaymentPage() {
                         <span className={`block font-bold text-base tabular-nums ${active ? 'text-primary' : 'text-foreground'}`}>
                           {formatCurrency(amt)}
                         </span>
-                        <span className="block text-[11px] text-muted-foreground">{presetMeta[i]}</span>
+                        <span className="block text-[11px] text-muted-foreground">{getPresetLabel(amt, i)}</span>
                       </div>
                     </div>
                     {i === 0 && (

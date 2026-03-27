@@ -3,6 +3,8 @@ import api from './api'
 export interface PaymentLink {
   id: string
   amount: number
+  duration: number
+  installmentAmount?: number
   patientName?: string
   patientContact?: string
   description?: string
@@ -30,6 +32,8 @@ export interface CreatePaymentLinkData {
   patientContact: string
   patientName?: string
   description?: string
+  duration?: number
+  installmentAmount?: number
 }
 
 export interface InitiatePaymentData {

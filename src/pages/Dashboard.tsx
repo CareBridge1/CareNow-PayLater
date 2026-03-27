@@ -220,18 +220,7 @@ export default function Dashboard() {
         </div>
       </Card>
 
-      {/* Backend offline notice */}
-      {!loading && (
-        <div className="flex items-start gap-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 transition-colors duration-300">
-          <AlertCircle className="size-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-bold text-amber-600 dark:text-amber-500 uppercase tracking-widest text-[10px]">Developer Environment</p>
-            <p className="text-muted-foreground mt-1">
-              Backend connectivity is currently simulated. For production features, please ensure the hospital API is active.
-            </p>
-          </div>
-        </div>
-      )}
+     
     </div>
   )
 }
